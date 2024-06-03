@@ -6,25 +6,36 @@ import fs from 'fs';
 import CollectionConfig from "../config/CollectionConfig";
 import ContractArguments from "../config/ContractArguments";
 
-// Step
-// - Set team address private key in the env
-// - Set SKIP_DEPLOY_CONTRACT to true (default: false) if you set the address in the config
-// - Set MAX_MINTING_AMOUNT_PER_ROUND to 0 (default: 55) if you want to mint all in one round
-
 enum AVATAR {
   LEGENDARY = 0,
   EPIC = 1,
   RARE = 2,
 }
 
-const SKIP_DEPLOY_CONTRACT = false;
-const MAX_MINTING_AMOUNT_PER_ROUND = 55; // Set the max minting amount / round
 const TIERS = [AVATAR.LEGENDARY, AVATAR.EPIC, AVATAR.RARE];
 const AVATARS = {
   [AVATAR.LEGENDARY]: "Legendary",
   [AVATAR.EPIC]: "Epic",
   [AVATAR.RARE]: "Rare",
 };
+
+// Preparation
+// - Create an empty folder on your computer
+// - Open your command line and change the directory to your created folder
+// - Run ``git clone https://github.com/RiXelanya/RealityCHain_Avatar/ .``
+// - Run ``yarn install``
+
+// Set the configuration
+// - Set TEAM_PRIVATE_KEY in the env
+// - Set SKIP_DEPLOY_CONTRACT to true if you already have the deployed contract (default: false)
+//   (make sure to put the contract address in config/CollectionConfig.ts)
+// - Set MAX_MINTING_AMOUNT_PER_ROUND to 0 if you want to mint all in one round (default: 55)
+
+// Start minting
+// - Run script ``yarn mint-team --network <your network (mainnet | testnet | localhost | truffle)>``
+
+const SKIP_DEPLOY_CONTRACT = false;
+const MAX_MINTING_AMOUNT_PER_ROUND = 55;
 
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
