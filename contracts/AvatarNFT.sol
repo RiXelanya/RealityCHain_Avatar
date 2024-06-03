@@ -19,6 +19,8 @@ error NonExistToken();
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
 
+    address private _teamAddress = 0x3EcED6d8940B3d28Cdc610651BFDBEC86b3d02cD;
+
     uint256 private _counterTokenIdLegendary = 1;
     uint256 private _counterTokenIdEpic = 56;
     uint256 private _counterTokenIdRare = 1001;
@@ -111,8 +113,12 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         if (_mintAmount < 1) {
             revert CannotZeroAmount();
         }
+        uint256 maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
+        if (_to == _teamAddress) {
+            maxAmountPerAddress = (avatar[TierAvatar.epic].supply + 1) / 5;
+        }
         uint256 _totalAddressClaim = _addressClaim[_to][_tier] + _mintAmount;
-        if (_totalAddressClaim > avatar[_tier].maxAmountPerAddress) {
+        if (_totalAddressClaim > maxAmountPerAddress) {
             revert ExceedeedTokenClaiming();
         }
         uint256 _totalCost = _mintAmount * avatar[_tier].cost;
@@ -124,18 +130,24 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     // ===================================================================
     //                                MINT
     // ===================================================================
-    function mintLegendary(bytes32[] calldata merkleProof) external payable {
+    function mintLegendary(uint256 mintAmount, bytes32[] calldata merkleProof) external payable {
         _isMintOpen(TierAvatar.legendary);
         _verifyWhitelist(TierAvatar.legendary, merkleProof);
-        _mintCompliance(TierAvatar.legendary, msg.sender, 1);
-        uint256 _totalMinted = _mintedTokenIdLegendary++;
+        _mintCompliance(TierAvatar.legendary, msg.sender, mintAmount);
+        uint256 _totalMinted = _mintedTokenIdLegendary + mintAmount;
         if (_totalMinted > avatar[TierAvatar.legendary].supply) {
             revert SupplyExceedeed();
         }
-        _addressClaim[msg.sender][TierAvatar.legendary]++;
-        uint256 _tokenId = _counterTokenIdLegendary;
-        _counterTokenIdLegendary++;
-        _mint(msg.sender, _tokenId);
+        _addressClaim[msg.sender][TierAvatar.legendary] += mintAmount;
+        _mintedTokenIdLegendary += mintAmount;
+        for (uint256 i = 0; i < mintAmount; ) {
+            uint256 _tokenId = _counterTokenIdLegendary;
+            _counterTokenIdLegendary++;
+            _mint(msg.sender, _tokenId);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function mintEpic(
@@ -198,6 +210,10 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     function setBaseUri(string memory uri) external onlyOwner {
         _baseUriAvatar = uri;
     }
+    
+    function setTeamAddress(address _address) external onlyOwner {
+        _teamAddress = _address;
+    }
 
     function withdraw() external onlyOwner nonReentrant {
         uint256 balance = address(this).balance;
@@ -206,7 +222,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
             value: (address(this).balance * 5) / 200
         }("");
         require(hs);
-        (bool os, ) = payable(0xEB2D4fA007225AC5bB5fCCc8033b0ED51F2690Ac).call{
+        (bool os, ) = payable(_teamAddress).call{
             value: address(this).balance
         }("");
         require(os);
@@ -241,5 +257,9 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
 
     function exist(uint256 tokenId) public view returns (bool) {
         return _exists(tokenId);
+    }
+
+    function getTeamAddress() public view returns (address) {
+        return _teamAddress;
     }
 }
