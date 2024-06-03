@@ -1,13 +1,15 @@
 import MerkleTree from "merkletreejs";
-import NftContractProvider from "../lib/NftContractProvider";
+import NftContractProvider, { NftContractType } from "../lib/NftContractProvider";
 import keccak256 from "keccak256";
 import { ethers } from "hardhat";
 import fs from 'fs';
+import CollectionConfig from "../config/CollectionConfig";
+import ContractArguments from "../config/ContractArguments";
 
 // Step
 // - Set team address private key in the env
-// - Set max minting amount per round (default: 55) 
-//   if you want to mint all in one round set to 0
+// - Set SKIP_DEPLOY_CONTRACT to true (default: false) if you set the address in the config
+// - Set MAX_MINTING_AMOUNT_PER_ROUND to 0 (default: 55) if you want to mint all in one round
 
 enum AVATAR {
   LEGENDARY = 0,
@@ -15,6 +17,7 @@ enum AVATAR {
   RARE = 2,
 }
 
+const SKIP_DEPLOY_CONTRACT = false;
 const MAX_MINTING_AMOUNT_PER_ROUND = 55; // Set the max minting amount / round
 const TIERS = [AVATAR.LEGENDARY, AVATAR.EPIC, AVATAR.RARE];
 const AVATARS = {
@@ -26,7 +29,23 @@ const AVATARS = {
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
 
-    const contract = await NftContractProvider.getContract();
+    let contractAddress;
+
+    if (!SKIP_DEPLOY_CONTRACT) {
+      console.log("\nStart deploying contract..");
+      console.log("============================");
+
+      const Contract = await ethers.getContractFactory(CollectionConfig.contractName);
+      const contract = await Contract.deploy(...ContractArguments) as unknown as NftContractType;
+    
+      await contract.deployed();
+
+      console.log("Greeter deployed to:", contract.address);
+
+      contractAddress = contract.address;
+    }
+
+    const contract = await NftContractProvider.getContract(contractAddress);
 
     let isError = false;
 
@@ -47,8 +66,9 @@ async function main() {
       const rootHash = merkleTree.getHexRoot();
       const proof = merkleTree.getHexProof(keccak256(teamAddress.address));
 
-      console.log(`\n${teamAddress.address} is starting to mint avatar...`);
-      console.log("========================================================================");
+      console.log("\nTeam address:", teamAddress.address);
+      console.log(`Start minting avatar...`);
+      console.log("=======================");
       for (const tier of TIERS) {
         try {
           const { cost, supply, isOpen } = await contract.avatar(tier);
