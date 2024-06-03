@@ -33,7 +33,9 @@
     "close-epic": "hardhat run scripts/9_close_epic.ts",
     "open-rare": "hardhat run scripts/10_open_rare.ts",
     "close-rare": "hardhat run scripts/11_close_rare.ts",
-    "deploy-airdrop": "hardhat run scripts/12_deploy_airdrop.ts"
+    "deploy-airdrop": "hardhat run scripts/12_deploy_airdrop.ts",
+    "mint-team": "hardhat run scripts/13_mint_team.ts"
+
   },
   "keywords": [],
   "author": "",

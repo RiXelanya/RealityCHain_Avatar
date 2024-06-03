@@ -7,3 +7,5 @@ typechain-types
 #Hardhat files
 cache
 artifacts
+
+ethers-error.log

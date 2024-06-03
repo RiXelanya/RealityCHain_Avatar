@@ -115,7 +115,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         }
         uint256 maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
         if (_to == _teamAddress) {
-            maxAmountPerAddress = (avatar[TierAvatar.epic].supply + 1) / 5;
+            maxAmountPerAddress = (avatar[_tier].supply + 1) / 5;
         }
         uint256 _totalAddressClaim = _addressClaim[_to][_tier] + _mintAmount;
         if (_totalAddressClaim > maxAmountPerAddress) {
