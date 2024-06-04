@@ -45,7 +45,7 @@ const defaultTotalMintLeft = {
 // - Run script ``yarn mint-team --network <your network (mainnet | testnet | localhost | truffle)>``
 
 const MAX_MINTING_AMOUNT_PER_ROUND = 3;
-const GAS_LIMIT = 500000;
+const GAS_LIMIT = 1000000;
 
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
