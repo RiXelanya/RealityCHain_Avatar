@@ -18,7 +18,6 @@ error NonExistToken();
 
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
-
     address private _teamAddress = 0x3EcED6d8940B3d28Cdc610651BFDBEC86b3d02cD;
 
     uint256 private _counterTokenIdLegendary = 1;
