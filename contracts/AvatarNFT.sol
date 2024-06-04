@@ -210,10 +210,6 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     function setBaseUri(string memory uri) external onlyOwner {
         _baseUriAvatar = uri;
     }
-    
-    function setTeamAddress(address _address) external onlyOwner {
-        _teamAddress = _address;
-    }
 
     function withdraw() external onlyOwner nonReentrant {
         uint256 balance = address(this).balance;
@@ -257,9 +253,5 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
 
     function exist(uint256 tokenId) public view returns (bool) {
         return _exists(tokenId);
-    }
-
-    function getTeamAddress() public view returns (address) {
-        return _teamAddress;
     }
 }
