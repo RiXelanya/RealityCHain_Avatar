@@ -12,23 +12,11 @@ enum AVATAR {
   RARE = 2,
 }
 
-type TotalMintLeft = {
-  [AVATAR.LEGENDARY]: number,
-  [AVATAR.EPIC]: number,
-  [AVATAR.RARE]: number, 
-}
-
 const TIERS = [AVATAR.LEGENDARY, AVATAR.EPIC, AVATAR.RARE];
 const AVATARS = {
   [AVATAR.LEGENDARY]: "Legendary",
   [AVATAR.EPIC]: "Epic",
   [AVATAR.RARE]: "Rare",
-};
-
-const defaultTotalMintLeft = {
-  [AVATAR.LEGENDARY]: -1,
-  [AVATAR.EPIC]: -1,
-  [AVATAR.RARE]: -1,
 };
 
 // Preparation
@@ -49,7 +37,6 @@ const GAS_LIMIT = 5000000;
 
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
-    const totalMintLeftPath = "total-mint-left.json";
     const nftContractPath = "nft-contract.json";
 
     let isError = false;
@@ -60,6 +47,7 @@ async function main() {
       }
 
       // Deploying the contract
+      let init = false;
       let contractAddress = readFile<{ contract: string }>(nftContractPath)?.contract;
 
       if (!contractAddress) {
@@ -73,6 +61,7 @@ async function main() {
 
         console.log("Greeter deployed to:", contract.address);
 
+        init = true;
         contractAddress = contract.address;
 
         fs.writeFileSync(nftContractPath, JSON.stringify({ contract: contractAddress }));
@@ -80,12 +69,13 @@ async function main() {
 
       const contract = await NftContractProvider.getContract(contractAddress);
 
-      // Set base uri
-      const uri = process.env.COLLECTION_URI_PREFIX;
-      await contract.connect(deployer).setBaseUri(uri);
+      if (init) {
+        // Set base uri
+        const uri = process.env.COLLECTION_URI_PREFIX;
+        await contract.connect(deployer).setBaseUri(uri);
+      }
 
       // Mint Avatar
-      const totalMintLeft = readFile<TotalMintLeft>(totalMintLeftPath) || defaultTotalMintLeft;
       const leafNodes = [deployer.address, teamAddress.address].map(addr => keccak256(addr));
       const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
       const rootHash = merkleTree.getHexRoot();
@@ -96,22 +86,24 @@ async function main() {
       console.log("=======================");
       for (const tier of TIERS) {
         try {
-          const { cost, supply, isOpen } = await contract.avatar(tier);
+          const { cost, supply, isOpen, merkleRoot } = await contract.avatar(tier);
 
           if (!isOpen) {
             await contract.connect(deployer).toggleMint(tier, true);
           }
   
-          if (tier !== AVATAR.RARE) {
+          if (tier !== AVATAR.RARE && merkleRoot === "0x0000000000000000000000000000000000000000000000000000000000000000") {
             await contract.connect(deployer).setMerkleRoot(tier, rootHash);
           }
   
-          const mintingAmount = totalMintLeft[tier] < 0 ? Math.ceil(Number(supply) / 5) : totalMintLeft[tier];
+          const totalMintClaimed = await contract.getAddressAlreadyClaimed(tier, teamAddress.address);
+          const totalMintLeft = Math.ceil(Number(supply) / 5) - Number(totalMintClaimed);
 
-          if (mintingAmount === 0) {
+          if (totalMintLeft === 0) {
             continue;
           }
 
+          const mintingAmount = totalMintLeft;
           const maxMintingAmountPerRound = MAX_MINTING_AMOUNT_PER_ROUND <= 0 ? mintingAmount : MAX_MINTING_AMOUNT_PER_ROUND;
           const totalRound = Math.ceil((mintingAmount) / maxMintingAmountPerRound);
           
@@ -145,9 +137,6 @@ async function main() {
             }
   
             mintingAmountLeft -= amount;
-            totalMintLeft[tier] = mintingAmountLeft
-
-            fs.writeFileSync(totalMintLeftPath, JSON.stringify(totalMintLeft, undefined, 2));
 
             // Withdraw
             await contract.connect(deployer).withdraw();
@@ -162,14 +151,9 @@ async function main() {
       }
     } catch (err: any) {
       fs.writeFileSync("ethers-error.log", err.toString());
-      console.log("Minting is failed\n");
-      console.log("See: ./ethers-error.log");
     }
 
-    if (isError) {
-      console.log("See: ./[tier]-error.log");
-    } else {
-      fs.unlink(totalMintLeftPath, () => ({}));
+    if (!isError) {
       fs.unlink(nftContractPath, () => ({}));
     }
 }
@@ -188,4 +172,8 @@ function readFile<T>(path: string): T | null {
   }
 
   return null;
+}
+
+async function wait(delay: number) {
+  return new Promise((resolve) => setTimeout(resolve, delay));
 }
