@@ -1,10 +1,9 @@
-import MerkleTree from "merkletreejs";
-import NftContractProvider, { NftContractType } from "../lib/NftContractProvider";
-import keccak256 from "keccak256";
-import { ethers } from "hardhat";
 import fs from 'fs';
 import CollectionConfig from "../config/CollectionConfig";
 import ContractArguments from "../config/ContractArguments";
+import NftContractProvider, { NftContractType } from "../lib/NftContractProvider";
+import { ethers } from "hardhat";
+
 
 enum AVATAR {
   LEGENDARY = 0,
@@ -43,7 +42,7 @@ async function main() {
 
     try {
       if (!deployer || !teamAddress) {
-        throw new Error('Please set the private key');
+        throw new Error('Please set the deployer or team address private key');
       }
 
       // Deploying the contract
@@ -75,31 +74,22 @@ async function main() {
         await contract.connect(deployer).setBaseUri(uri);
       }
 
-      // Mint Avatar
-      const leafNodes = [deployer.address, teamAddress.address].map(addr => keccak256(addr));
-      const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
-      const rootHash = merkleTree.getHexRoot();
-      const proof = merkleTree.getHexProof(keccak256(teamAddress.address));
-
       console.log("\nTeam address:", teamAddress.address);
       console.log(`Start minting avatar...`);
       console.log("=======================");
       for (const tier of TIERS) {
         try {
-          const { cost, supply, isOpen, merkleRoot } = await contract.avatar(tier);
+          const { cost, supply, isOpen } = await contract.avatar(tier);
 
           if (!isOpen) {
             await contract.connect(deployer).toggleMint(tier, true);
-          }
-  
-          if (tier !== AVATAR.RARE && merkleRoot === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-            await contract.connect(deployer).setMerkleRoot(tier, rootHash);
           }
   
           const totalMintClaimed = await contract.getAddressAlreadyClaimed(tier, teamAddress.address);
           const totalMintLeft = Math.ceil(Number(supply) / 5) - Number(totalMintClaimed);
 
           if (totalMintLeft === 0) {
+            console.log(`${AVATARS[tier]} is already minted. Total:`, totalMintClaimed.toString());
             continue;
           }
 
@@ -114,27 +104,11 @@ async function main() {
             const amount = maxMintingAmountPerRound <= mintingAmountLeft ? maxMintingAmountPerRound : mintingAmountLeft;
   
             console.log(`Round ${i + 1}: Minting ${amount}...`);
-  
-            if (tier === AVATAR.LEGENDARY) {
-              await contract.connect(teamAddress).mintLegendary(BigInt(amount), proof, { 
-                value: BigInt(cost) * BigInt(amount),
-                gasLimit: BigInt(GAS_LIMIT),
-              });
-            }
-    
-            if (tier === AVATAR.EPIC) {
-              await contract.connect(teamAddress).mintEpic(BigInt(amount), proof, { 
-                value: BigInt(cost) * BigInt(amount),
-                gasLimit: BigInt(GAS_LIMIT),
-              });
-            }
-    
-            if (tier === AVATAR.RARE) {
-              await contract.connect(teamAddress).mintRare(BigInt(amount), { 
-                value: BigInt(cost) * BigInt(amount),
-                gasLimit: BigInt(GAS_LIMIT),
-              });
-            }
+
+            await contract.connect(teamAddress).mintTeam(BigInt(amount), tier, {
+              value: BigInt(cost) * BigInt(amount),
+              gasLimit: BigInt(GAS_LIMIT),
+            });
   
             mintingAmountLeft -= amount;
 
@@ -172,8 +146,4 @@ function readFile<T>(path: string): T | null {
   }
 
   return null;
-}
-
-async function wait(delay: number) {
-  return new Promise((resolve) => setTimeout(resolve, delay));
 }

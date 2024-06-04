@@ -15,6 +15,7 @@ error CannotZeroAmount();
 error InvalidTierInput();
 error MintingClose();
 error NonExistToken();
+error Unauthorized();
 
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
@@ -23,9 +24,6 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     uint256 private _counterTokenIdLegendary = 1;
     uint256 private _counterTokenIdEpic = 56;
     uint256 private _counterTokenIdRare = 1001;
-    uint256 private _mintedTokenIdLegendary;
-    uint256 private _mintedTokenIdEpic;
-    uint256 private _mintedTokenIdRare;
 
     string private _baseUriAvatar = "";
 
@@ -43,6 +41,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         rare
     }
 
+    mapping(TierAvatar => uint256) private _minted;
     mapping(TierAvatar => NftAvatarSpec) public avatar;
     mapping(address => mapping(TierAvatar => uint256)) private _addressClaim;
 
@@ -126,27 +125,43 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         }
     }
 
+    function _mintAvatar(uint256 mintAmount, TierAvatar tier) private {
+        uint256 _tierSupply = avatar[tier].supply;
+        uint256 _availableSupply = _tierSupply - (_tierSupply + 1) / 5; 
+        uint256 _totalMinted = _minted[tier] + mintAmount;
+        if (_totalMinted > _availableSupply) {
+            revert SupplyExceedeed();
+        }
+
+        _addressClaim[msg.sender][tier] += mintAmount;
+        _minted[tier] += mintAmount;
+        for (uint256 i = 0; i < mintAmount; ) {
+            uint256 _tokenId;
+            if (tier == TierAvatar.legendary) {
+                _tokenId = _counterTokenIdLegendary;
+                _counterTokenIdLegendary++;
+            } else if (tier == TierAvatar.epic) {
+                _tokenId = _counterTokenIdEpic;
+                _counterTokenIdEpic++;
+            } else {
+                _tokenId = _counterTokenIdRare;
+                _counterTokenIdRare++;
+            }
+            _mint(msg.sender, _tokenId);
+            unchecked {
+                i++;
+            }
+        }
+    }
+ 
     // ===================================================================
     //                                MINT
     // ===================================================================
-    function mintLegendary(uint256 mintAmount, bytes32[] calldata merkleProof) external payable {
+    function mintLegendary(bytes32[] calldata merkleProof) external payable {
         _isMintOpen(TierAvatar.legendary);
         _verifyWhitelist(TierAvatar.legendary, merkleProof);
-        _mintCompliance(TierAvatar.legendary, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdLegendary + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.legendary].supply) {
-            revert SupplyExceedeed();
-        }
-        _addressClaim[msg.sender][TierAvatar.legendary] += mintAmount;
-        _mintedTokenIdLegendary += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdLegendary;
-            _counterTokenIdLegendary++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+        _mintCompliance(TierAvatar.legendary, msg.sender, 1);
+        _mintAvatar(1, TierAvatar.legendary);
     }
 
     function mintEpic(
@@ -156,39 +171,23 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         _isMintOpen(TierAvatar.epic);
         _verifyWhitelist(TierAvatar.epic, merkleProof);
         _mintCompliance(TierAvatar.epic, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdEpic + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.epic].supply) {
-            revert SupplyExceedeed();
-        }
-        _addressClaim[msg.sender][TierAvatar.epic] += mintAmount;
-        _mintedTokenIdEpic += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdEpic;
-            _counterTokenIdEpic++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+        _mintAvatar(mintAmount, TierAvatar.epic);
     }
 
     function mintRare(uint256 mintAmount) external payable {
         _isMintOpen(TierAvatar.rare);
         _mintCompliance(TierAvatar.rare, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdRare + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.rare].supply) {
-            revert SupplyExceedeed();
+        _mintAvatar(mintAmount, TierAvatar.rare);
+    }
+
+    function mintTeam(uint256 mintAmount, TierAvatar tier) external payable {
+        if (msg.sender != _teamAddress) {
+            revert Unauthorized();
         }
-        _addressClaim[msg.sender][TierAvatar.rare] += mintAmount;
-        _mintedTokenIdRare += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdRare;
-            _counterTokenIdRare++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+
+        _isMintOpen(tier);
+        _mintCompliance(tier, msg.sender, mintAmount);
+        _mintAvatar(mintAmount, tier);
     }
 
     // ===================================================================
