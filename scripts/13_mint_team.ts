@@ -40,24 +40,6 @@ const MAX_MINTING_AMOUNT_PER_ROUND = 55;
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
 
-    let contractAddress;
-
-    if (!SKIP_DEPLOY_CONTRACT) {
-      console.log("\nStart deploying contract..");
-      console.log("============================");
-
-      const Contract = await ethers.getContractFactory(CollectionConfig.contractName);
-      const contract = await Contract.deploy(...ContractArguments) as unknown as NftContractType;
-    
-      await contract.deployed();
-
-      console.log("Greeter deployed to:", contract.address);
-
-      contractAddress = contract.address;
-    }
-
-    const contract = await NftContractProvider.getContract(contractAddress);
-
     let isError = false;
 
     try {
@@ -65,13 +47,26 @@ async function main() {
         throw new Error('Please set the private key');
       }
 
-      if (await contract.getTeamAddress() !== teamAddress.address) {
-        console.log("\nStart registering team address...");
-        console.log("===================================");
-        await contract.setTeamAddress(teamAddress.address);
-        console.log(await contract.getTeamAddress(), "is registered!");
+      // Deploying the contract
+      let contractAddress;
+
+      if (!SKIP_DEPLOY_CONTRACT) {
+        console.log("\nStart deploying contract..");
+        console.log("============================");
+
+        const Contract = await ethers.getContractFactory(CollectionConfig.contractName);
+        const contract = await Contract.deploy(...ContractArguments) as unknown as NftContractType;
+      
+        await contract.deployed();
+
+        console.log("Greeter deployed to:", contract.address);
+
+        contractAddress = contract.address;
       }
 
+      const contract = await NftContractProvider.getContract(contractAddress);
+
+      // Mint Avatart
       const leafNodes = [deployer.address, teamAddress.address].map(addr => keccak256(addr));
       const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
       const rootHash = merkleTree.getHexRoot();
@@ -135,6 +130,7 @@ async function main() {
     } catch (err: any) {
       fs.writeFileSync("ethers-error.log", err.toString());
       console.log("Minting is failed\n");
+      console.log("See: ./ethers-error.log");
     }
 
     if (isError) {
