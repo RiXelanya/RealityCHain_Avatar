@@ -12,11 +12,23 @@ enum AVATAR {
   RARE = 2,
 }
 
+type TotalMintLeft = {
+  [AVATAR.LEGENDARY]: number,
+  [AVATAR.EPIC]: number,
+  [AVATAR.RARE]: number, 
+}
+
 const TIERS = [AVATAR.LEGENDARY, AVATAR.EPIC, AVATAR.RARE];
 const AVATARS = {
   [AVATAR.LEGENDARY]: "Legendary",
   [AVATAR.EPIC]: "Epic",
   [AVATAR.RARE]: "Rare",
+};
+
+const defaultTotalMintLeft = {
+  [AVATAR.LEGENDARY]: -1,
+  [AVATAR.EPIC]: -1,
+  [AVATAR.RARE]: -1,
 };
 
 // Preparation
@@ -27,18 +39,17 @@ const AVATARS = {
 
 // Set the configuration
 // - Set TEAM_PRIVATE_KEY in the env
-// - Set SKIP_DEPLOY_CONTRACT to true if you already have the deployed contract (default: false)
-//   (make sure to put the contract address in config/CollectionConfig.ts)
 // - Set MAX_MINTING_AMOUNT_PER_ROUND to 0 if you want to mint all in one round (default: 55)
 
 // Start minting
 // - Run script ``yarn mint-team --network <your network (mainnet | testnet | localhost | truffle)>``
 
-const SKIP_DEPLOY_CONTRACT = false;
-const MAX_MINTING_AMOUNT_PER_ROUND = 55;
+const MAX_MINTING_AMOUNT_PER_ROUND = 10;
 
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
+    const totalMintLeftPath = "total-mint-left.json";
+    const nftContractPath = "nft-contract.json";
 
     let isError = false;
 
@@ -48,9 +59,9 @@ async function main() {
       }
 
       // Deploying the contract
-      let contractAddress;
+      let contractAddress = readFile<{ contract: string }>(nftContractPath)?.contract;
 
-      if (!SKIP_DEPLOY_CONTRACT) {
+      if (!contractAddress) {
         console.log("\nStart deploying contract..");
         console.log("============================");
 
@@ -62,11 +73,18 @@ async function main() {
         console.log("Greeter deployed to:", contract.address);
 
         contractAddress = contract.address;
+
+        fs.writeFileSync(nftContractPath, JSON.stringify({ contract: contractAddress }));
       }
 
       const contract = await NftContractProvider.getContract(contractAddress);
 
-      // Mint Avatart
+      // Set base uri
+      const uri = process.env.COLLECTION_URI_PREFIX;
+      await contract.connect(deployer).setBaseUri(uri);
+
+      // Mint Avatar
+      const totalMintLeft = readFile<TotalMintLeft>(totalMintLeftPath) || defaultTotalMintLeft;
       const leafNodes = [deployer.address, teamAddress.address].map(addr => keccak256(addr));
       const merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
       const rootHash = merkleTree.getHexRoot();
@@ -87,7 +105,12 @@ async function main() {
             await contract.connect(deployer).setMerkleRoot(tier, rootHash);
           }
   
-          const mintingAmount = Math.ceil(Number(supply) / 5);
+          const mintingAmount = totalMintLeft[tier] < 0 ? Math.ceil(Number(supply) / 5) : totalMintLeft[tier];
+
+          if (mintingAmount === 0) {
+            continue;
+          }
+
           const maxMintingAmountPerRound = MAX_MINTING_AMOUNT_PER_ROUND <= 0 ? mintingAmount : MAX_MINTING_AMOUNT_PER_ROUND;
           const totalRound = Math.ceil((mintingAmount) / maxMintingAmountPerRound);
           
@@ -118,12 +141,18 @@ async function main() {
             }
   
             mintingAmountLeft -= amount;
+            totalMintLeft[tier] = mintingAmountLeft
+
+            fs.writeFileSync(totalMintLeftPath, JSON.stringify(totalMintLeft, undefined, 2));
+
+            // Withdraw
+            await contract.connect(deployer).withdraw();
           }
   
           console.log(`${AVATARS[tier]} avatar is minted!\n`);
         } catch (err: any) {
           isError = true;
-          fs.writeFileSync("ethers-error.log", err.toString());
+          fs.writeFileSync(`${AVATARS[tier].toLowerCase()}-error.log`, err.toString());
           console.log("Minting is failed\n");
         }
       }
@@ -134,7 +163,10 @@ async function main() {
     }
 
     if (isError) {
-      console.log("See: ./ethers-error.log");
+      console.log("See: ./[tier]-error.log");
+    } else {
+      fs.unlink(totalMintLeftPath, () => ({}));
+      fs.unlink(nftContractPath, () => ({}));
     }
 }
 
@@ -142,3 +174,14 @@ main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
 });
+
+function readFile<T>(path: string): T | null {
+  try {
+    const data = fs.readFileSync(path, "utf-8");
+    return JSON.parse(data);
+  } catch {
+    //
+  }
+
+  return null;
+}

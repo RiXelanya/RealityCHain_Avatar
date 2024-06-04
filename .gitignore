@@ -8,4 +8,4 @@ typechain-types
 cache
 artifacts
 
-ethers-error.log
+*error.log
