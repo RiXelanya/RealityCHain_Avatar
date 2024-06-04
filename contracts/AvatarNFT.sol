@@ -15,17 +15,15 @@ error CannotZeroAmount();
 error InvalidTierInput();
 error MintingClose();
 error NonExistToken();
+error Unauthorized();
 
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
-    address private _teamAddress = 0x3EcED6d8940B3d28Cdc610651BFDBEC86b3d02cD;
+    address private _teamAddress = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
 
     uint256 private _counterTokenIdLegendary = 1;
     uint256 private _counterTokenIdEpic = 56;
     uint256 private _counterTokenIdRare = 1001;
-    uint256 private _mintedTokenIdLegendary;
-    uint256 private _mintedTokenIdEpic;
-    uint256 private _mintedTokenIdRare;
 
     string private _baseUriAvatar = "";
 
@@ -43,6 +41,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         rare
     }
 
+    mapping(TierAvatar => uint256) private _minted;
     mapping(TierAvatar => NftAvatarSpec) public avatar;
     mapping(address => mapping(TierAvatar => uint256)) private _addressClaim;
 
@@ -112,41 +111,58 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         if (_mintAmount < 1) {
             revert CannotZeroAmount();
         }
-        uint256 maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
+        uint256 _totalSupply = avatar[_tier].supply;
+        uint256 _teamSupply = (_totalSupply + 1) / 5;
+        uint256 _maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
         if (_to == _teamAddress) {
-            maxAmountPerAddress = (avatar[_tier].supply + 1) / 5;
+            _maxAmountPerAddress = _teamSupply;
+        } else {
+            _totalSupply -= _teamSupply;
         }
         uint256 _totalAddressClaim = _addressClaim[_to][_tier] + _mintAmount;
-        if (_totalAddressClaim > maxAmountPerAddress) {
+        if (_totalAddressClaim > _maxAmountPerAddress) {
             revert ExceedeedTokenClaiming();
         }
         uint256 _totalCost = _mintAmount * avatar[_tier].cost;
         if (msg.value < _totalCost) {
             revert InsufficientFunds();
         }
+        uint256 _totalMinted = _minted[_tier] + _mintAmount;
+        if (_totalMinted > _totalSupply) {
+            revert SupplyExceedeed();
+        }
     }
 
+    function _mintAvatar(uint256 mintAmount, TierAvatar tier) private {
+        _addressClaim[msg.sender][tier] += mintAmount;
+        _minted[tier] += mintAmount;
+        for (uint256 i = 0; i < mintAmount; ) {
+            uint256 _tokenId;
+            if (tier == TierAvatar.legendary) {
+                _tokenId = _counterTokenIdLegendary;
+                _counterTokenIdLegendary++;
+            } else if (tier == TierAvatar.epic) {
+                _tokenId = _counterTokenIdEpic;
+                _counterTokenIdEpic++;
+            } else {
+                _tokenId = _counterTokenIdRare;
+                _counterTokenIdRare++;
+            }
+            _mint(msg.sender, _tokenId);
+            unchecked {
+                i++;
+            }
+        }
+    }
+ 
     // ===================================================================
     //                                MINT
     // ===================================================================
-    function mintLegendary(uint256 mintAmount, bytes32[] calldata merkleProof) external payable {
+    function mintLegendary(bytes32[] calldata merkleProof) external payable {
         _isMintOpen(TierAvatar.legendary);
         _verifyWhitelist(TierAvatar.legendary, merkleProof);
-        _mintCompliance(TierAvatar.legendary, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdLegendary + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.legendary].supply) {
-            revert SupplyExceedeed();
-        }
-        _addressClaim[msg.sender][TierAvatar.legendary] += mintAmount;
-        _mintedTokenIdLegendary += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdLegendary;
-            _counterTokenIdLegendary++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+        _mintCompliance(TierAvatar.legendary, msg.sender, 1);
+        _mintAvatar(1, TierAvatar.legendary);
     }
 
     function mintEpic(
@@ -156,39 +172,23 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         _isMintOpen(TierAvatar.epic);
         _verifyWhitelist(TierAvatar.epic, merkleProof);
         _mintCompliance(TierAvatar.epic, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdEpic + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.epic].supply) {
-            revert SupplyExceedeed();
-        }
-        _addressClaim[msg.sender][TierAvatar.epic] += mintAmount;
-        _mintedTokenIdEpic += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdEpic;
-            _counterTokenIdEpic++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+        _mintAvatar(mintAmount, TierAvatar.epic);
     }
 
     function mintRare(uint256 mintAmount) external payable {
         _isMintOpen(TierAvatar.rare);
         _mintCompliance(TierAvatar.rare, msg.sender, mintAmount);
-        uint256 _totalMinted = _mintedTokenIdRare + mintAmount;
-        if (_totalMinted > avatar[TierAvatar.rare].supply) {
-            revert SupplyExceedeed();
+        _mintAvatar(mintAmount, TierAvatar.rare);
+    }
+
+    function mintTeam(uint256 mintAmount, TierAvatar tier) external payable {
+        if (msg.sender != _teamAddress) {
+            revert Unauthorized();
         }
-        _addressClaim[msg.sender][TierAvatar.rare] += mintAmount;
-        _mintedTokenIdRare += mintAmount;
-        for (uint256 i = 0; i < mintAmount; ) {
-            uint256 _tokenId = _counterTokenIdRare;
-            _counterTokenIdRare++;
-            _mint(msg.sender, _tokenId);
-            unchecked {
-                ++i;
-            }
-        }
+
+        _isMintOpen(tier);
+        _mintCompliance(tier, msg.sender, mintAmount);
+        _mintAvatar(mintAmount, tier);
     }
 
     // ===================================================================
