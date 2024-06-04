@@ -31,7 +31,7 @@ const AVATARS = {
 // Start minting
 // - Run script ``yarn mint-team --network <your network (mainnet | testnet | localhost | truffle)>``
 
-const MAX_MINTING_AMOUNT_PER_ROUND = 50;
+const MAX_MINTING_AMOUNT_PER_ROUND = 1;
 const GAS_LIMIT = 5000000;
 
 async function main() {
