@@ -32,7 +32,7 @@ const AVATARS = {
 // - Run script ``yarn mint-team --network <your network (mainnet | testnet | localhost | truffle)>``
 
 const MAX_MINTING_AMOUNT_PER_ROUND = 1;
-const GAS_LIMIT = 5000000;
+const GAS_LIMIT = 10000000;
 
 async function main() {
     const [deployer, teamAddress] = await ethers.getSigners();
