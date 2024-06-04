@@ -19,7 +19,7 @@ error Unauthorized();
 
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
-    address private _teamAddress = 0x3EcED6d8940B3d28Cdc610651BFDBEC86b3d02cD;
+    address private _teamAddress = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
 
     uint256 private _counterTokenIdLegendary = 1;
     uint256 private _counterTokenIdEpic = 56;
@@ -111,28 +111,29 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
         if (_mintAmount < 1) {
             revert CannotZeroAmount();
         }
-        uint256 maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
+        uint256 _totalSupply = avatar[_tier].supply;
+        uint256 _teamSupply = (_totalSupply + 1) / 5;
+        uint256 _maxAmountPerAddress = avatar[_tier].maxAmountPerAddress;
         if (_to == _teamAddress) {
-            maxAmountPerAddress = (avatar[_tier].supply + 1) / 5;
+            _maxAmountPerAddress = _teamSupply;
+        } else {
+            _totalSupply -= _teamSupply;
         }
         uint256 _totalAddressClaim = _addressClaim[_to][_tier] + _mintAmount;
-        if (_totalAddressClaim > maxAmountPerAddress) {
+        if (_totalAddressClaim > _maxAmountPerAddress) {
             revert ExceedeedTokenClaiming();
         }
         uint256 _totalCost = _mintAmount * avatar[_tier].cost;
         if (msg.value < _totalCost) {
             revert InsufficientFunds();
         }
+        uint256 _totalMinted = _minted[_tier] + _mintAmount;
+        if (_totalMinted > _totalSupply) {
+            revert SupplyExceedeed();
+        }
     }
 
     function _mintAvatar(uint256 mintAmount, TierAvatar tier) private {
-        uint256 _tierSupply = avatar[tier].supply;
-        uint256 _availableSupply = _tierSupply - (_tierSupply + 1) / 5; 
-        uint256 _totalMinted = _minted[tier] + mintAmount;
-        if (_totalMinted > _availableSupply) {
-            revert SupplyExceedeed();
-        }
-
         _addressClaim[msg.sender][tier] += mintAmount;
         _minted[tier] += mintAmount;
         for (uint256 i = 0; i < mintAmount; ) {

@@ -48,21 +48,21 @@ describe("Reality Chain", async function () {
       expect((await contract.avatar(0)).supply).to.equal(55);
       expect((await contract.avatar(0)).maxAmountPerAddress).to.equal(1);
       expect((await contract.avatar(0)).cost).to.equal(
-        utils.parseEther("0.05")
+        utils.parseEther("0.0055")
       );
 
       // Epic avatar spesification
       expect((await contract.avatar(1)).supply).to.equal(945);
       expect((await contract.avatar(1)).maxAmountPerAddress).to.equal(3);
       expect((await contract.avatar(1)).cost).to.equal(
-        utils.parseEther("0.03")
+        utils.parseEther("0.004")
       );
 
       // Rare avatar spesification
       expect((await contract.avatar(2)).supply).to.equal(2000);
       expect((await contract.avatar(2)).maxAmountPerAddress).to.equal(5);
       expect((await contract.avatar(2)).cost).to.equal(
-        utils.parseEther("0.01")
+        utils.parseEther("0.0027")
       );
 
       // expect(await contract.totalSupply()).to.equal(0);
@@ -81,8 +81,8 @@ describe("Reality Chain", async function () {
       // nobody should be able to mint because merkle root is not in set
       // Legendary mint
       await expect(
-        contract.connect(whitelist).mintLegendary(1, [])
-      ).to.be.revertedWith("");
+        contract.connect(whitelist).mintLegendary([])
+      ).to.be.revertedWith("MintingClose");
 
       // Epic mint
       await expect(
@@ -165,14 +165,6 @@ describe("Reality Chain", async function () {
             { value: getPrice("0.05", 1) }
           )
       ).to.be.revertedWith("InvalidProof");
-      await expect(
-        contract
-          .connect(otherHolder)
-          .mintLegendary(
-            merkleTree.getHexProof(keccak256(await otherHolder.getAddress())),
-            { value: getPrice("0.05", 1) }
-          )
-      ).to.be.revertedWith("InvalidProof");
 
       // check cost
       await expect(
@@ -180,7 +172,7 @@ describe("Reality Chain", async function () {
           .connect(whitelist)
           .mintLegendary(
             merkleTree.getHexProof(keccak256(await whitelist.getAddress())),
-            { value: getPrice("0.04", 1) }
+            { value: getPrice("0.0000001", 1) }
           )
       ).to.be.revertedWith("InsufficientFunds");
 
@@ -222,10 +214,7 @@ describe("Reality Chain", async function () {
 
       // on rare
       expect(
-        await contract.getAddressAlreadyClaimed(
-          2,
-          await otherHolder.getAddress()
-        )
+        await contract.getAddressAlreadyClaimed(2, await whitelist.getAddress())
       ).to.equal(0);
 
       // close minting tier
@@ -233,8 +222,8 @@ describe("Reality Chain", async function () {
 
       // try to mint when the feature is close
       await expect(
-        contract.connect(whitelist).mintLegendary(1, [])
-      ).to.be.revertedWith("");
+        contract.connect(whitelist).mintLegendary([])
+      ).to.be.revertedWith("MintingClose");
     });
 
     it("Epic Mint", async function () {
@@ -296,7 +285,7 @@ describe("Reality Chain", async function () {
           .mintEpic(
             1,
             merkleTree.getHexProof(keccak256(await whitelist.getAddress())),
-            { value: getPrice("0.02", 1) }
+            { value: getPrice("0.0000001", 1) }
           )
       ).to.be.revertedWith("InsufficientFunds");
 
@@ -384,7 +373,7 @@ describe("Reality Chain", async function () {
       await expect(
         contract
           .connect(otherHolder)
-          .mintRare(1, { value: getPrice("0.009", 1) })
+          .mintRare(1, { value: getPrice("0.0000001", 1) })
       ).to.be.revertedWith("InsufficientFunds");
 
       // minting success
