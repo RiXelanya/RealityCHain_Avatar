@@ -55,7 +55,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
             merkleRoot: 0x00,
             supply: 55,
             maxAmountPerAddress: 1,
-            cost: 0.05 ether
+            cost: 0.0055 ether
         });
 
         avatar[TierAvatar.epic] = NftAvatarSpec({
@@ -63,7 +63,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
             merkleRoot: 0x00,
             supply: 945,
             maxAmountPerAddress: 3,
-            cost: 0.03 ether
+            cost: 0.004 ether
         });
 
         avatar[TierAvatar.rare] = NftAvatarSpec({
@@ -71,7 +71,7 @@ contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
             merkleRoot: 0x00,
             supply: 2000,
             maxAmountPerAddress: 5,
-            cost: 0.01 ether
+            cost: 0.0027 ether
         });
     }
 
