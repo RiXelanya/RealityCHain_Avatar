@@ -19,7 +19,7 @@ error Unauthorized();
 
 contract AvatarNFT is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint256;
-    address private _teamAddress = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
+    address private _teamAddress = 0x3EcED6d8940B3d28Cdc610651BFDBEC86b3d02cD;
 
     uint256 private _counterTokenIdLegendary = 1;
     uint256 private _counterTokenIdEpic = 56;
